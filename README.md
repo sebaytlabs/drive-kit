@@ -12,6 +12,14 @@ The rule behind all of them: **one source of truth, as many backups as you like.
 | `shot_search.py` | Reads the text in your screenshots once, so you can find one by a word that was on screen. | Windows, Mac, Linux |
 | `record.sh` | Records the screen or one window: hardware H.264 when your graphics card has it, desktop audio included, and a file that survives a crash. | Linux (X11) |
 
+## The app
+
+```
+python3 drive_kit_app.py
+```
+
+There's one window for all of it: **Back up**, **Tidy a folder**, **Sort files**, **Find a screenshot** and **Record the screen**. Each page explains itself, shows what would happen first and asks before it changes anything. Everything below also works from the command line.
+
 ## mirror.py
 
 ```
