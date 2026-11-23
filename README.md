@@ -1,3 +1,5 @@
+<img src="icon.svg" alt="" width="112" align="right">
+
 # Drive Kit
 
 **Your files, on your own drives: backed up, tidy, sorted and searchable.**
