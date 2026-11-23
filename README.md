@@ -88,8 +88,9 @@ It takes about four minutes. Delete the practice folder afterwards. The **▶ Tu
 ## Why it works the way it does
 
 - **Compare by content, not by name.** People rename and move files. If a backup only compared names, every renamed file would be copied again and the backup would fill with duplicates. Back up hashes the files, so a renamed file is recognized.
-- **Check every copy.** A copy can fail silently, from a loose cable or a dying drive. Each copied file's SHA-256 checksum is compared with the original's and written to a log on the backup, and any mismatch is flagged. (The operating system may answer that check from memory instead of the disk. For a full disk-level check, run Check again after unplugging and replugging the drive.)
-- **Never overwrite.** If the backup has a *different* file at the same path, the new one is saved as `name (from Main).ext`. Two versions are better than a silently lost one.
+- **Check every copy.** A copy can fail silently, from a loose cable or a dying drive. Each copied file's SHA-256 checksum is compared with the original's and written to a log on the backup, and any mismatch is flagged. (The operating system may answer that check from memory instead of the disk, so it catches a bad copy, not every bad disk. To check the disk itself, unplug and replug it, then compare the files with the `sha256` column in the log, for example with `sha256sum`.)
+- **Never overwrite.** If the backup has a *different* file at the same path, the new one is saved as `name (from Main).ext`, or `(from Main 2)` and up if that name is taken too. Two versions are better than a silently lost one.
+- **A copy is only named when it's whole.** Each file is copied under a temporary name (`.name.mirror-part`) and renamed once it's complete, so a copy cut short by a pulled cable never passes for a finished file. The next run copies it again.
 - **Plan first, then act.** Tidy writes its whole plan before moving anything, and skips any file that changed since. You see exactly what will happen.
 - **The Trash, not delete.** Every removal can be undone with your system's own Restore.
 - **Keep where it came from.** A flattened file is named `<old folder>__<file>`, so `taxes__2024.pdf` still tells you its story.
@@ -109,7 +110,7 @@ python3 mirror.py /media/me/Main /media/me/Backup --only Documents Pictures --ca
 ```
 
 - **Skipped:** a file the backup already has at the same path and size, or with the same content under any name. Files you renamed or moved on the backup aren't copied again.
-- **Never overwritten:** if the path holds a different file, the copy is saved as `name (from Main).ext`.
+- **Never overwritten:** if the path holds a different file, the copy is saved as `name (from Main).ext` (then `(from Main 2)` and up). Names are compared without case, as exFAT and NTFS do, and two source files whose safe names match (`a:b.txt` and `a-b.txt`) each keep their own copy.
 - **Safe names:** characters that exFAT and NTFS can't store (`: * ? " < > |`) become `-`, so a Linux drive can be mirrored to a drive Windows and Mac can read.
 - **Space limit:** it stops before the destination passes `--cap` percent full (default 80). That leaves space for the next sync, and SSDs slow down when they're nearly full.
 - **Both ways:** run it in each direction to keep two drives in step without ever deleting anything.

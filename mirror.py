@@ -11,7 +11,9 @@
 
 A file is skipped when DEST already has it at the same path with the same size, or has the same content
 anywhere (so files you moved or renamed on DEST don't get copied twice). Otherwise it goes to the same path on DEST.
-If that path holds a different file, the copy is named "name (from SOURCE).ext". Nothing is overwritten.
+If that path holds a different file, the copy is named "name (from SOURCE).ext" (then "(from SOURCE 2)", ...).
+Nothing is overwritten. Each copy is written beside its place under a temporary name and only takes its real
+name once it's complete, so a copy cut short never looks like a finished file.
 
 Names are made safe for exFAT/NTFS drives (: * ? " < > | become -), so a Linux drive can mirror to a drive
 that Windows and Mac can read. Log: DEST/logs/mirror-<date>.tsv
@@ -27,10 +29,26 @@ import tempfile
 SYSTEM = {"$RECYCLE.BIN", "System Volume Information", "lost+found", ".Trash-1000", ".Trashes",
           ".Spotlight-V100", ".fseventsd", "timeshift", "logs"}
 BAD_CHARS = str.maketrans({c: "-" for c in ':*?"<>|'})
+PART = ".mirror-part"  # a copy in progress: ".name.mirror-part" next to where it goes
 
 
 def safe(rel):
     return rel.translate(BAD_CHARS)
+
+
+def free_name(dr, taken, tag):
+    """dr, or "name (from tag).ext", "name (from tag 2).ext"... whichever isn't taken. Compared without case:
+    exFAT and NTFS drives treat File.txt and file.txt as one name."""
+    base, ext = os.path.splitext(dr)
+    n = 0
+    while dr.lower() in taken:
+        n += 1
+        dr = f"{base} (from {tag}{'' if n == 1 else f' {n}'}){ext}"
+    return dr
+
+
+def part_path(d):
+    return os.path.join(os.path.dirname(d), "." + os.path.basename(d) + PART)
 
 
 def walk(root, only, skip):
@@ -74,8 +92,11 @@ def plan(src, dst, only=None, skip=frozenset()):
             s = os.path.getsize(os.path.join(dst, r))
         except OSError:
             continue
+        if r.endswith(PART):
+            continue  # a copy cut short last time: it's written again, never counted as there
         by_size[s].append(r)
         have[r] = s
+    taken = {r.lower() for r in have}
     stats, todo = collections.Counter(), []
     tag = os.path.basename(os.path.normpath(src)) or "source"
     for r in walk(src, only, skip):
@@ -92,9 +113,8 @@ def plan(src, dst, only=None, skip=frozenset()):
         if any(sha(os.path.join(dst, c)) == sha(sp) for c in by_size.get(s, [])):
             stats["already there under another name"] += 1
             continue
-        if dr in have:
-            base, ext = os.path.splitext(dr)
-            dr = f"{base} (from {tag}){ext}"
+        dr = free_name(dr, taken, tag)  # a different file there, or one this run already sends there
+        taken.add(dr.lower())
         todo.append((r, dr, s))
         stats["to copy"] += 1
     return stats, todo
@@ -119,7 +139,14 @@ def apply(src, dst, todo, cap):
                 break
             d = os.path.join(dst, dr)
             os.makedirs(os.path.dirname(d), exist_ok=True)
-            shutil.copy2(os.path.join(src, r), d)
+            part = part_path(d)
+            shutil.copy2(os.path.join(src, r), part)
+            if os.path.exists(d):  # appeared since the plan was made: leave it be
+                os.remove(part)
+                L.write(f"SKIPPED (now taken)\t{r}\t{dr}\t\n")
+                copied += 1
+                continue
+            os.replace(part, d)
             ok = sha(d) == sha(os.path.join(src, r))
             bad += not ok
             copied += 1
@@ -161,6 +188,28 @@ def selftest():
         assert plan(a, b)[1] == []
         _, todo = plan(a, b, only=["docs"])
         assert todo == []
+        assert not [f for _, _, fs in os.walk(b) for f in fs if f.endswith(PART)]
+        # never overwritten: a "(from A)" name already holding something else, and two names that become one
+        w = lambda p, data: open(os.path.join(t, p), "w").write(data)
+        w("A/clash.txt", "newer")
+        w("B/clash (from A).txt", "taken!")
+        w("A/docs/x.txt", "changed")
+        if colon:
+            w("A/docs/a-b.txt", "dash")
+            w("A/docs/a:b.txt", "colon")
+        stats, todo = plan(a, b)
+        got = sorted(d for _, d, _ in todo)
+        want = ["clash (from A 2).txt", os.path.join("docs", "x (from A).txt")] + colon * [
+            os.path.join("docs", "a-b.txt"), os.path.join("docs", "a-b (from A).txt")]
+        assert got == sorted(want), got
+        apply(a, b, todo, cap=100)
+        assert open(os.path.join(b, "clash (from A).txt")).read() == "taken!"
+        if colon:
+            assert sorted(open(os.path.join(b, "docs", n)).read() for n in ("a-b.txt", "a-b (from A).txt")) == \
+                ["colon", "dash"]
+        open(part_path(os.path.join(b, "cut.txt")), "w").write("half")  # a copy cut short is ignored, then redone
+        w("A/cut.txt", "whole")
+        assert [d for _, d, _ in plan(a, b)[1]] == ["cut.txt"]
     print("selftest ok")
 
 
