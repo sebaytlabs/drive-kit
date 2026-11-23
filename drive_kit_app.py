@@ -20,7 +20,7 @@ from tkinter import filedialog, messagebox
 import flatten
 import mirror
 import shot_search
-from appkit import BG, DIM, FG, FONT, FROZEN, LINE, PANEL, App, Capture, Job, Page, handle_cli, open_path, write
+from appkit import BG, DIM, FG, FONT, FROZEN, App, Capture, Job, Page, handle_cli, open_path, write
 
 ACCENT = "#2b8a3e"
 HERE = Path(__file__).resolve().parent
