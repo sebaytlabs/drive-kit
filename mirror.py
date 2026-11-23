@@ -144,14 +144,17 @@ def report(stats, todo, dst, cap):
 def selftest():
     with tempfile.TemporaryDirectory() as t:
         a, b = os.path.join(t, "A"), os.path.join(t, "B")
-        for p, data in [("A/docs/x.txt", "one"), ("A/docs/what: now.txt", "two"), ("A/same.txt", "same"),
-                        ("A/clash.txt", "new"), ("A/lost+found/junk", "j"), ("B/moved/renamed.txt", "same"),
-                        ("B/clash.txt", "old!")]:
+        colon = os.name != "nt"  # Windows can't name a file with ':' (it would write a hidden stream instead)
+        files = [("A/docs/x.txt", "one"), ("A/same.txt", "same"), ("A/clash.txt", "new"), ("A/lost+found/junk", "j"),
+                 ("B/moved/renamed.txt", "same"), ("B/clash.txt", "old!")] + colon * [("A/docs/what: now.txt", "two")]
+        for p, data in files:
             os.makedirs(os.path.dirname(os.path.join(t, p)), exist_ok=True)
-            open(os.path.join(t, p), "w").write(data)
+            with open(os.path.join(t, p), "w") as f:
+                f.write(data)
         stats, todo = plan(a, b)
         got = sorted(d for _, d, _ in todo)
-        assert got == ["clash (from A).txt", "docs/what- now.txt", "docs/x.txt"], got
+        want = ["clash (from A).txt", os.path.join("docs", "x.txt")] + colon * [os.path.join("docs", "what- now.txt")]
+        assert got == sorted(want), got
         assert stats["already there under another name"] == 1
         apply(a, b, todo, cap=100)
         assert open(os.path.join(b, "clash.txt")).read() == "old!"
