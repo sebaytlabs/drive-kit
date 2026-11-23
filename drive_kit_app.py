@@ -20,7 +20,7 @@ from tkinter import filedialog, messagebox
 import flatten
 import mirror
 import shot_search
-from appkit import BG, DIM, FG, FONT, LINE, PANEL, App, Capture, Job, Page, open_path, write
+from appkit import BG, DIM, FG, FONT, FROZEN, LINE, PANEL, App, Capture, Job, Page, handle_cli, open_path, write
 
 ACCENT = "#2b8a3e"
 HERE = Path(__file__).resolve().parent
@@ -231,7 +231,13 @@ class SortPage(Page):
                   "'Choose folder' in its window.", 11, DIM, pady=(14, 0))
 
     def open_sorter(self):
-        subprocess.Popen([sys.executable, str(HERE / "sorter.py")])
+        # The sorter is GTK, which a download build doesn't carry, so it runs on the system's own Python there.
+        python = shutil.which("python3") if FROZEN else sys.executable
+        if not python:
+            messagebox.showinfo("Sort", "The sorter needs Python 3 with GTK: sudo apt install python3-gi "
+                                        "gir1.2-gtk-3.0 gir1.2-gst-plugins-base-1.0 gstreamer1.0-plugins-good")
+            return
+        subprocess.Popen([python, str(HERE / "sorter.py")])
         self.app.say("The sorter is opening in its own window.")
 
 
@@ -277,6 +283,10 @@ class FindPage(Page):
             messagebox.showinfo("Find", "Pick a folder first.")
             return
         engine = shot_search.engine()
+        if not engine and FROZEN:  # the download carries rapidocr; this only happens if it couldn't load
+            write(self.log, "The text reader couldn't start. Install tesseract (apt install tesseract-ocr / "
+                            "brew install tesseract / winget install UB-Mannheim.TesseractOCR) and try again.\n")
+            return
         if not engine:
             if not messagebox.askyesno("Find", "Reading text needs an OCR engine (rapidocr, about 60 MB). "
                                                "Install it now?"):
@@ -503,4 +513,5 @@ def main():
 
 
 if __name__ == "__main__":
+    handle_cli()
     main()

@@ -48,9 +48,24 @@ Drive Kit is built to be a free alternative to these. Each is good at its job. D
 | **Find a screenshot** (`shot_search.py`) | Reads the text in your screenshots once, so you can find one by a word that was on screen. | Windows, Mac, Linux |
 | **Record the screen** (`record.sh`) | Records the screen or one window: hardware H.264 when your graphics card has it, the computer's sound included, and a file that survives a crash. | Linux (X11) |
 
+## Download
+
+Free, no account. Get the file for your computer from the [latest release](https://github.com/sebaytlabs/drive-kit/releases/latest):
+
+| Your computer | File | Then |
+|---|---|---|
+| Windows 10 or 11 | `DriveKit-<version>-windows-setup.exe` | Run it. If Windows says *Windows protected your PC*, click **More info → Run anyway** (once). |
+| Mac with Apple chip (M1 and later) | `DriveKit-<version>-mac-ARM64.dmg` | Open it and drag Drive Kit to Applications. The first time, macOS says it can't check the app: open **System Settings → Privacy & Security**, scroll down and click **Open Anyway** (once). |
+| Mac with Intel chip | `DriveKit-<version>-mac-X64.dmg` | Same as above. |
+| Linux | `DriveKit-<version>-x86_64.AppImage` | Make it runnable (right-click → Properties → *Allow executing*, or `chmod +x` it), then double-click it. |
+
+The download includes the screenshot text reader. On Linux, **Sort files** uses your system's GTK (see [sorter.py](#sorterpy) for the one install line) and **Record the screen** uses ffmpeg.
+
+The apps aren't signed with a paid developer certificate yet, which is why Windows and macOS ask once.
+
 ## Start
 
-You need Python 3.9 or newer (on Linux also `python3-tk`).
+To run it from source instead, you need Python 3.9 or newer (on Linux also `python3-tk`).
 
 ```
 git clone https://github.com/sebaytlabs/drive-kit

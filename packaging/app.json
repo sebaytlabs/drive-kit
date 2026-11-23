@@ -1,0 +1,17 @@
+{
+  "name": "Drive Kit",
+  "id": "drive-kit",
+  "entry": "drive_kit_app.py",
+  "comment": "Your files on your own drives: backed up, tidy, sorted, searchable.",
+  "categories": "Utility;FileTools;",
+  "data": ["sorter.py", "record.sh"],
+  "pip": ["rapidocr_onnxruntime"],
+  "collect": ["rapidocr_onnxruntime"],
+  "check": ["mirror", "flatten", "shot_search", "rapidocr_onnxruntime"],
+  "tests": [
+    "{python} mirror.py --selftest",
+    {"cmd": "{python} flatten.py selftest", "os": ["linux", "mac"]},
+    "{python} shot_search.py --selftest"
+  ],
+  "downloads": ["windows", "mac", "linux"]
+}
