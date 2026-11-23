@@ -60,12 +60,14 @@ class BackupPage(Page):
                     "Press Check to see what would be copied. Nothing changes yet.",
                     "Press Copy now. Run it again any time; only new files are copied."])
         self.src, self.dst, self.cap = tk.StringVar(), tk.StringVar(), tk.IntVar(value=80)
-        self.path_field("Copy from", self.src)
-        self.path_field("Copy to (backup)", self.dst)
+        self.fields = tk.Frame(self.body, bg=BG)
+        self.fields.pack(fill="x")
+        self.path_field("Copy from", self.src, parent=self.fields)
+        self.path_field("Copy to (backup)", self.dst, parent=self.fields)
         r = self.row()
         tk.Label(r, text="Stop at", bg=BG, fg=FG, font=(FONT, 11), width=16, anchor="w").pack(side="left")
         tk.Spinbox(r, from_=50, to=98, textvariable=self.cap, width=5, font=(FONT, 11)).pack(side="left")
-        tk.Label(r, text="% full (leaves room so the drive stays healthy)", bg=BG, fg=DIM,
+        tk.Label(r, text="% full (leaves room for the next backup)", bg=BG, fg=DIM,
                  font=(FONT, 10)).pack(side="left", padx=8)
         r = self.row(pady=10)
         self.check_btn = self.button(r, "Check", self.check)
@@ -144,8 +146,10 @@ class TidyPage(Page):
                     "Add the messy folders inside it that you want tidied.",
                     "Press Make a plan and read it. Then press Do it."])
         self.root = tk.StringVar()
-        self.path_field("Main folder", self.root)
-        r = self.row()
+        self.fields = tk.Frame(self.body, bg=BG)
+        self.fields.pack(fill="x")
+        self.path_field("Main folder", self.root, parent=self.fields)
+        r = self.row(self.fields)
         tk.Label(r, text="Folders to tidy", bg=BG, fg=FG, font=(FONT, 11), width=16, anchor="nw").pack(side="left",
                                                                                                     anchor="n")
         self.list = tk.Listbox(r, height=4, font=(FONT, 11), relief="solid", bd=1)
@@ -219,7 +223,8 @@ class SortPage(Page):
                     "Pick a folder in it.",
                     "K keeps, D sends to the Trash, U undoes. Left and Right browse."])
         r = self.row(pady=10)
-        self.button(r, "Open the sorter", self.open_sorter, state="normal" if LINUX else "disabled").pack(side="left")
+        self.open_btn = self.button(r, "Open the sorter", self.open_sorter, state="normal" if LINUX else "disabled")
+        self.open_btn.pack(side="left")
         if not LINUX:
             self.text("The sorter needs Linux (GTK) for now.", 11, DIM)
         self.text("It remembers the last folder and file. If it opens on a folder you don't want, press "
@@ -258,6 +263,7 @@ class FindPage(Page):
         self.q.pack(side="left", fill="x", expand=True, ipady=4)
         self.q.bind("<Return>", lambda e: self.search())
         self.button(r, "Search", self.search).pack(side="left", padx=8)
+        self.search_row = r
         self.results = tk.Listbox(self.body, font=(FONT, 11), relief="solid", bd=1, height=6)
         self.results.pack(fill="both", expand=True, pady=6)
         self.results.bind("<Double-Button-1>", self.open_hit)
@@ -329,7 +335,7 @@ class RecordPage(Page):
         self.audio = tk.BooleanVar(value=True)
         tk.Checkbutton(self.body, text="Include the computer's sound", variable=self.audio, bg=BG,
                        font=(FONT, 11)).pack(anchor="w", pady=4)
-        r = self.row(pady=10)
+        r = self.buttons = self.row(pady=10)
         ok = LINUX and shutil.which("ffmpeg")
         self.win_btn = self.button(r, "Record a window", lambda: self.start("--window"),
                                    state="normal" if ok else "disabled")
@@ -337,7 +343,8 @@ class RecordPage(Page):
         self.full_btn = self.button(r, "Record the whole screen", lambda: self.start("--full"),
                                     state="normal" if ok else "disabled")
         self.full_btn.pack(side="left", padx=8)
-        self.stop_btn = tk.Button(r, text="■  Stop", command=self.stop, bg="#e03131", fg="white", relief="flat",
+        self.stop_btn = tk.Button(r, text="■  Stop", command=self.stop, bg="#e4e7ec", fg=DIM, relief="flat",
+                                  activebackground="#c92a2a", activeforeground="white", disabledforeground="#adb5bd",
                                   font=(FONT, 11, "bold"), padx=16, pady=7, state="disabled")
         self.stop_btn.pack(side="left", padx=8)
         self.button(r, "Open the folder", lambda: open_path(self.out.get()), primary=False).pack(side="right")
@@ -351,7 +358,7 @@ class RecordPage(Page):
         self.proc = subprocess.Popen(cmd, stdin=subprocess.DEVNULL, start_new_session=True)
         for b in (self.win_btn, self.full_btn):
             b.config(state="disabled")
-        self.stop_btn.config(state="normal")
+        self.stop_btn.config(state="normal", bg="#e03131", fg="white")
         self.state.config(text="Click the window to record…" if mode == "--window" else "● Recording", fg="#e03131")
         if mode == "--window":
             self.after(1500, lambda: self.proc and self.proc.poll() is None and
@@ -372,8 +379,114 @@ class RecordPage(Page):
         self.proc = None
         for b in (self.win_btn, self.full_btn):
             b.config(state="normal")
-        self.stop_btn.config(state="disabled")
+        self.stop_btn.config(state="disabled", bg="#e4e7ec", fg=DIM)
         self.state.config(text=f"Saved in {self.out.get()}", fg=FG)
+
+
+# ------------------------------------------------------------------ the tutorial
+PRACTICE = Path.home() / "Drive Kit practice"
+
+
+def make_practice():
+    """Small throwaway folders for the tutorial, so nobody learns on their real drives."""
+    files = {
+        "Main/Documents/taxes 2025.txt": "practice file\n",
+        "Main/Documents/recipes/soup.txt": "two onions, one pot\n",
+        "Main/Pictures/beach.txt": "pretend this is a photo\n",
+        "Main/Music/song.txt": "la la la\n",
+        "Backup/Documents/taxes 2025.txt": "practice file\n",          # the backup already has this one
+        "Backup/Old/soup (renamed).txt": "two onions, one pot\n",     # and this one, under another name
+        "Tidy/Old laptop/Desktop/New folder/letter.txt": "Dear bank,\n",
+        "Tidy/Old laptop/Desktop/New folder (2)/letter copy.txt": "Dear bank,\n",  # an exact duplicate
+        "Tidy/Old laptop/.DS_Store": "junk",
+        "Tidy/Phone dump/DCIM/100APPLE/IMG_0001.jpg": "pretend photo",
+        "Tidy/Phone dump/Voice memos/memo 1.m4a": "pretend audio",
+    }
+    for rel, text in files.items():
+        f = PRACTICE / rel
+        if not f.exists():
+            f.parent.mkdir(parents=True, exist_ok=True)
+            f.write_text(text, encoding="utf-8")
+    return PRACTICE
+
+
+def tutorial(app):
+    pg = app.page
+    log = lambda key: pg(key).log.get("1.0", "end")
+    grew = lambda key, words: (lambda old: any(w in log(key)[len(old.rstrip()):] for w in words))
+
+    def fill_backup():
+        make_practice()
+        p = pg("backup")
+        p.src.set(str(PRACTICE / "Main"))
+        p.dst.set(str(PRACTICE / "Backup"))
+        return log("backup")
+
+    def fill_tidy():
+        make_practice()
+        p = pg("tidy")
+        p.root.set(str(PRACTICE / "Tidy"))
+        p.list.delete(0, "end")
+        for d in ("Old laptop", "Phone dump"):
+            if (PRACTICE / "Tidy" / d).exists():
+                p.list.insert("end", str(PRACTICE / "Tidy" / d))
+        return log("tidy")
+
+    return [
+        {"title": "Welcome to Drive Kit", "target": lambda: app.tour_button,
+         "text": "Drive Kit is for people who keep their files on their own drives. One rule runs through all of "
+                 "it: one source of truth, as many backups as you like. A backup is a copy you only read, so it can't "
+                 "drift. Nothing here deletes for good. What's removed goes to the Trash.\n\nYou'll practice on "
+                 "small throwaway folders, not your real files. About four minutes.",
+         "do": "click Next."},
+        {"title": "Back up: pick two folders", "page": "backup", "target": lambda: pg("backup").fields,
+         "text": f"Copy from is the drive you work on. Copy to is the backup. We've filled in two practice folders "
+                 f"in '{PRACTICE.name}' in your home folder. For real use, press Browse.",
+         "do": "look at the two folders, then click Next.", "start": fill_backup},
+        {"title": "Check first", "page": "backup", "target": lambda: pg("backup").check_btn,
+         "text": "Check compares the two by content, not by name, and copies nothing yet. The practice backup "
+                 "already has the soup recipe under another name, so it won't be copied twice.",
+         "do": "click Check and read what it would copy.",
+         "start": lambda: log("backup"), "check": grew("backup", ["Press Copy now", "Nothing to copy"])},
+        {"title": "Copy now", "page": "backup", "target": lambda: pg("backup").copy_btn,
+         "text": "Each copy is checked byte for byte and listed in a log on the backup. A file that would land on a "
+                 "different file with the same name gets ' (from Main)' added instead of overwriting.",
+         "do": "click Copy now.", "start": lambda: log("backup"), "check": grew("backup", ["Done."])},
+        {"title": "Run it again any time", "page": "backup", "target": lambda: pg("backup").check_btn,
+         "text": "Only new files are ever copied, so you can run it after every work session. It also stops before "
+                 "the backup gets too full.",
+         "do": "click Check again. This time there's nothing to copy.",
+         "start": lambda: log("backup"), "check": grew("backup", ["Nothing to copy"])},
+        {"title": "Tidy a folder", "page": "tidy", "target": lambda: pg("tidy").fields,
+         "text": "Old laptops and phone dumps leave folders inside folders inside folders. Tidy turns them into five "
+                 "flat folders: Documents, Music, Pictures, Videos and Other. We've filled in a practice mess.",
+         "do": "click Next.", "start": fill_tidy},
+        {"title": "Make a plan", "page": "tidy", "target": lambda: pg("tidy").plan_btn,
+         "text": "The plan lists every move first, and nothing moves yet. A file from a subfolder keeps where it came "
+                 "from in its name, like 'New folder__letter.txt'. Exact duplicates and junk like .DS_Store go to "
+                 "the Trash.",
+         "do": "click Make a plan and read it.", "start": lambda: log("tidy"),
+         "check": grew("tidy", ["That's the plan"])},
+        {"title": "Do it", "page": "tidy", "target": lambda: pg("tidy").do_btn,
+         "text": "It asks once more, then moves the files. A file that changed since the plan is skipped.",
+         "do": "click Do it, then Yes.", "start": lambda: log("tidy"), "check": grew("tidy", ["Done.", "Problem"])},
+        {"title": "Sort files", "page": "sort", "target": lambda: pg("sort").open_btn,
+         "text": "For a pile of photos and videos: each file full size, K to keep, D to Trash, U to undo. It "
+                 "remembers where you stopped, so a thousand photos can take a few evenings.",
+         "do": "try it later on a real folder. Click Next."},
+        {"title": "Find a screenshot", "page": "find", "target": lambda: pg("find").search_row,
+         "text": "It reads the text in your screenshots once. After that you can find one by any word that was on "
+                 "the screen, like an order number, a name or an error message.",
+         "do": "pick your screenshots folder and press Read the text when you have a few minutes. Click Next."},
+        {"title": "Record the screen", "page": "record", "target": lambda: pg("record").buttons,
+         "text": "One window or the whole screen, with the computer's sound. It uses your graphics card when it can, "
+                 "and the file survives a crash.",
+         "do": "click Next."},
+        {"title": "You're ready", "target": lambda: app.tour_button,
+         "text": f"The practice folders are in '{PRACTICE}'. Look inside to see what Back up and Tidy did, then "
+                 "delete them whenever you like.\n\nPress F1 on any page for help with that page.",
+         "do": "click Done."},
+    ]
 
 
 def main():
@@ -385,6 +498,7 @@ def main():
     app.add_page("record", "Record the screen", RecordPage)
     if (HERE / "icon.png").exists():
         app.iconphoto(True, tk.PhotoImage(file=str(HERE / "icon.png")))
+    app.set_tutorial(lambda: tutorial(app), Path.home() / ".drive-kit" / "settings.json")
     app.run("backup")
 
 
