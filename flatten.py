@@ -69,8 +69,13 @@ def walk(path, skipped):
                 yield p
 
 
-def digest(path, fast, cache={}):
-    if path not in cache:
+_digests = {}  # one process may plan many times (the app): key on mode, size and mtime so a hash is never stale
+
+
+def digest(path, fast):
+    st = os.stat(path)
+    key = (path, fast, st.st_size, st.st_mtime_ns)
+    if key not in _digests:
         h = hashlib.blake2b()
         with open(path, "rb") as fh:
             if fast:
@@ -80,8 +85,8 @@ def digest(path, fast, cache={}):
             else:
                 while chunk := fh.read(4 * CHUNK):
                     h.update(chunk)
-        cache[path] = h.hexdigest()
-    return cache[path]
+        _digests[key] = h.hexdigest()
+    return _digests[key]
 
 
 def target(rel):
@@ -267,6 +272,12 @@ def _selftest():
         trashed = sorted(f for _, _, fs in os.walk(os.path.join(t, ".Trash-test/files", tb)) for f in fs)
         assert trashed == [".DS_Store", "song.mp3", "zcopy.jpg"], trashed
         assert os.listdir(os.path.join(t, ".Trash-test/info"))
+        v1, v2 = os.path.join(t, "Videos/f__v1.mov"), os.path.join(t, "Videos/f__v2.mov")
+        assert digest(v1, True) == digest(v2, True) and digest(v1, False) != digest(v2, False)  # fast hash never reused
+        st = os.stat(v1)
+        open(v1, "w").write("Z" * (3 * CHUNK))
+        os.utime(v1, ns=(st.st_atime_ns, st.st_mtime_ns + 10**9))
+        assert digest(v1, False) != digest(v2, False) and digest(v1, True) != digest(v2, True)  # an edit is seen
 
 
 if __name__ == "__main__":
